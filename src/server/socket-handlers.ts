@@ -116,6 +116,7 @@ export function registerSocketHandlers(
         io.to(room.code).emit("gameOver", {
           winnerId: room.winnerId,
           secret: room.secret,
+          players: toPublicRoomState(room).players,
         });
       }
     });
@@ -129,7 +130,7 @@ export function registerSocketHandlers(
 
       if (room.players.length < 2) {
         socket.emit("error", {
-          message: "Se necesitan dos jugadores para jugar de nuevo.",
+          message: "Se necesitan dos jugadores para reiniciar.",
         });
         return;
       }
@@ -140,12 +141,14 @@ export function registerSocketHandlers(
       }
 
       startRematch(room);
+      const publicPlayers = toPublicRoomState(room).players;
 
       for (const player of room.players) {
         io.to(player.socketId).emit("rematchStarted", {
           currentTurnId: room.currentTurnId!,
           yourTurn: player.id === room.currentTurnId,
           guesses: room.guesses,
+          players: publicPlayers,
         });
       }
     });

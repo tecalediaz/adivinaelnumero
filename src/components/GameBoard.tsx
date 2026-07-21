@@ -111,8 +111,19 @@ export function GameBoard({
           <p className="secret-reveal">
             El número secreto era <strong>{secret}</strong>
           </p>
-          <button className="btn btn-primary" onClick={onRematch} style={{ marginTop: "1rem" }}>
-            Jugar de nuevo
+          <p className="score-summary">
+            Marcador:{" "}
+            {players
+              .map((p) => `${p.nickname} ${p.wins}`)
+              .join(" — ")}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onRematch}
+            style={{ marginTop: "1rem" }}
+          >
+            Reiniciar juego
           </button>
         </div>
       )}

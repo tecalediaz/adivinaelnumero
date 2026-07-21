@@ -6,6 +6,7 @@ export interface Player {
   id: string;
   nickname: string;
   socketId: string;
+  wins: number;
 }
 
 export interface GuessEntry {
@@ -29,6 +30,7 @@ export interface RoomState {
 export interface PublicPlayer {
   id: string;
   nickname: string;
+  wins: number;
 }
 
 export interface PublicRoomState {
@@ -72,11 +74,16 @@ export interface ServerToClientEvents {
     nextTurnId: string | null;
     guesses: GuessEntry[];
   }) => void;
-  gameOver: (payload: { winnerId: string; secret: number }) => void;
+  gameOver: (payload: {
+    winnerId: string;
+    secret: number;
+    players: PublicPlayer[];
+  }) => void;
   rematchStarted: (payload: {
     currentTurnId: string;
     yourTurn: boolean;
     guesses: GuessEntry[];
+    players: PublicPlayer[];
   }) => void;
   playerDisconnected: (payload: { message: string }) => void;
   error: (payload: { message: string }) => void;

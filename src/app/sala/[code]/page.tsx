@@ -38,7 +38,7 @@ export default function SalaPage() {
     }
 
     if (storedPlayerId && storedNickname) {
-      setPlayers([{ id: storedPlayerId, nickname: storedNickname }]);
+      setPlayers([{ id: storedPlayerId, nickname: storedNickname, wins: 0 }]);
     }
 
     function onConnect() {
@@ -114,13 +114,16 @@ export default function SalaPage() {
     function onGameOver({
       winnerId: winner,
       secret: revealedSecret,
+      players: updatedPlayers,
     }: {
       winnerId: string;
       secret: number;
+      players: PublicPlayer[];
     }) {
       setStatus("finished");
       setWinnerId(winner);
       setSecret(revealedSecret);
+      setPlayers(updatedPlayers);
       setYourTurn(false);
       setCurrentTurnId(null);
     }
@@ -129,15 +132,18 @@ export default function SalaPage() {
       currentTurnId: turnId,
       yourTurn: isYourTurn,
       guesses: clearedGuesses,
+      players: updatedPlayers,
     }: {
       currentTurnId: string;
       yourTurn: boolean;
       guesses: GuessEntry[];
+      players: PublicPlayer[];
     }) {
       setStatus("playing");
       setCurrentTurnId(turnId);
       setYourTurn(isYourTurn);
       setGuesses(clearedGuesses);
+      setPlayers(updatedPlayers);
       setWinnerId(null);
       setSecret(null);
       setError("");

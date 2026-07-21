@@ -28,7 +28,10 @@ export function Lobby({ code, players, status }: LobbyProps) {
         {players.map((player) => (
           <li key={player.id}>
             <span className="player-dot" />
-            {player.nickname}
+            <span className="player-name">{player.nickname}</span>
+            <span className="player-wins">
+              {player.wins} {player.wins === 1 ? "victoria" : "victorias"}
+            </span>
           </li>
         ))}
         {players.length < 2 && (

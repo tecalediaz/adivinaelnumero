@@ -27,7 +27,7 @@ function generateSecret(): number {
 }
 
 function toPublicPlayers(players: Player[]): PublicPlayer[] {
-  return players.map(({ id, nickname }) => ({ id, nickname }));
+  return players.map(({ id, nickname, wins }) => ({ id, nickname, wins }));
 }
 
 export function toPublicRoomState(room: RoomState): PublicRoomState {
@@ -51,7 +51,7 @@ export function createRoom(nickname: string, socketId: string): RoomState {
   const room: RoomState = {
     code,
     status: "waiting",
-    players: [{ id: playerId, nickname: nickname.trim(), socketId }],
+    players: [{ id: playerId, nickname: nickname.trim(), socketId, wins: 0 }],
     hostId: playerId,
     secret: null,
     currentTurnId: null,
@@ -88,6 +88,7 @@ export function joinRoom(
     id: playerId,
     nickname: nickname.trim(),
     socketId,
+    wins: 0,
   });
 
   return { room, playerId };
@@ -168,6 +169,7 @@ export function processGuess(
     room.status = "finished";
     room.winnerId = playerId;
     room.currentTurnId = null;
+    player.wins += 1;
     return { entry, gameOver: true };
   }
 
