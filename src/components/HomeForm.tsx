@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
-import { GameType } from "@/lib/types";
+import { GameType, TATETI_SIZES, TatetiSize } from "@/lib/types";
 
 interface HomeFormProps {
   gameType: GameType;
@@ -13,6 +13,7 @@ export function HomeForm({ gameType }: HomeFormProps) {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
+  const [boardSize, setBoardSize] = useState<TatetiSize>(3);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<"create" | "join" | null>(null);
 
@@ -56,7 +57,11 @@ export function HomeForm({ gameType }: HomeFormProps) {
 
     socket.on("roomCreated", onCreated);
     socket.on("error", onError);
-    socket.emit("createRoom", { nickname: trimmed, gameType });
+    socket.emit("createRoom", {
+      nickname: trimmed,
+      gameType,
+      boardSize: gameType === "tateti" ? boardSize : undefined,
+    });
   }
 
   function handleJoin() {
@@ -94,6 +99,27 @@ export function HomeForm({ gameType }: HomeFormProps) {
           autoComplete="off"
         />
       </div>
+
+      {gameType === "tateti" && (
+        <div className="field">
+          <label>Tamaño del tablero</label>
+          <div className="size-options">
+            {TATETI_SIZES.map((size) => (
+              <button
+                key={size}
+                type="button"
+                className={`size-option ${boardSize === size ? "active" : ""}`}
+                onClick={() => setBoardSize(size)}
+              >
+                {size}×{size}
+              </button>
+            ))}
+          </div>
+          <p className="field-hint">
+            Se necesita una línea de {boardSize} para ganar.
+          </p>
+        </div>
+      )}
 
       <button
         className="btn btn-primary"

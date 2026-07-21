@@ -7,10 +7,11 @@ import { TatetiBoard } from "@/components/TatetiBoard";
 import { getSocket } from "@/lib/socket";
 import {
   Board,
-  EMPTY_BOARD,
   Mark,
   PublicPlayer,
   RoomStatus,
+  TatetiSize,
+  createEmptyBoard,
 } from "@/lib/types";
 
 export default function TatetiSalaPage() {
@@ -20,7 +21,8 @@ export default function TatetiSalaPage() {
   const [players, setPlayers] = useState<PublicPlayer[]>([]);
   const [status, setStatus] = useState<RoomStatus>("waiting");
   const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
-  const [board, setBoard] = useState<Board>([...EMPTY_BOARD] as Board);
+  const [boardSize, setBoardSize] = useState<TatetiSize>(3);
+  const [board, setBoard] = useState<Board>(() => createEmptyBoard(3));
   const [marks, setMarks] = useState<Record<string, Mark>>({});
   const [yourTurn, setYourTurn] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -36,10 +38,7 @@ export default function TatetiSalaPage() {
     const storedPlayerId = sessionStorage.getItem("playerId");
     const storedNickname = sessionStorage.getItem("nickname");
 
-    if (storedPlayerId) {
-      setPlayerId(storedPlayerId);
-    }
-
+    if (storedPlayerId) setPlayerId(storedPlayerId);
     if (storedPlayerId && storedNickname) {
       setPlayers([{ id: storedPlayerId, nickname: storedNickname, wins: 0 }]);
     }
@@ -48,121 +47,99 @@ export default function TatetiSalaPage() {
       setConnected(true);
     }
 
-    function onRoomJoined({
-      playerId: joinedPlayerId,
-      players: joinedPlayers,
-      status: roomStatus,
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-      board: roomBoard,
-      marks: roomMarks,
-      isDraw: roomDraw,
-      winnerId: roomWinner,
-    }: {
+    function onRoomJoined(payload: {
       playerId: string;
       players: PublicPlayer[];
       status: RoomStatus;
       currentTurnId: string | null;
       yourTurn: boolean;
       board: Board;
+      boardSize: TatetiSize;
       marks: Record<string, Mark>;
       isDraw: boolean;
       winnerId: string | null;
     }) {
-      setPlayerId(joinedPlayerId);
-      sessionStorage.setItem("playerId", joinedPlayerId);
-      setPlayers(joinedPlayers);
-      setStatus(roomStatus);
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
-      setBoard(roomBoard);
-      setMarks(roomMarks);
-      setIsDraw(roomDraw);
-      setWinnerId(roomWinner);
+      setPlayerId(payload.playerId);
+      sessionStorage.setItem("playerId", payload.playerId);
+      setPlayers(payload.players);
+      setStatus(payload.status);
+      setCurrentTurnId(payload.currentTurnId);
+      setYourTurn(payload.yourTurn);
+      setBoard(payload.board);
+      setBoardSize(payload.boardSize);
+      setMarks(payload.marks);
+      setIsDraw(payload.isDraw);
+      setWinnerId(payload.winnerId);
     }
 
-    function onPlayerJoined({ players: joinedPlayers }: { players: PublicPlayer[] }) {
-      setPlayers(joinedPlayers);
+    function onPlayerJoined({ players: joined }: { players: PublicPlayer[] }) {
+      setPlayers(joined);
     }
 
-    function onGameStarted({
-      players: gamePlayers,
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-      board: gameBoard,
-      marks: gameMarks,
-    }: {
+    function onGameStarted(payload: {
       players: PublicPlayer[];
-      currentTurnId: string;
+      currentTurnId: string | null;
       yourTurn: boolean;
       board: Board;
+      boardSize: TatetiSize;
       marks: Record<string, Mark>;
     }) {
-      setPlayers(gamePlayers);
+      setPlayers(payload.players);
       setStatus("playing");
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
-      setBoard(gameBoard);
-      setMarks(gameMarks);
+      setCurrentTurnId(payload.currentTurnId);
+      setYourTurn(payload.yourTurn);
+      setBoard(payload.board);
+      setBoardSize(payload.boardSize);
+      setMarks(payload.marks);
       setWinnerId(null);
       setIsDraw(false);
       setError("");
     }
 
-    function onBoardUpdated({
-      board: updatedBoard,
-      nextTurnId,
-    }: {
+    function onBoardUpdated(payload: {
       board: Board;
+      boardSize: TatetiSize;
       nextTurnId: string | null;
     }) {
-      setBoard(updatedBoard);
-      setCurrentTurnId(nextTurnId);
-      const activePlayerId = sessionStorage.getItem("playerId");
-      if (activePlayerId) {
-        setYourTurn(nextTurnId === activePlayerId);
-      }
+      setBoard(payload.board);
+      setBoardSize(payload.boardSize);
+      setCurrentTurnId(payload.nextTurnId);
+      const active = sessionStorage.getItem("playerId");
+      if (active) setYourTurn(payload.nextTurnId === active);
     }
 
-    function onGameOver({
-      winnerId: winner,
-      isDraw: draw,
-      players: updatedPlayers,
-      board: finalBoard,
-    }: {
+    function onGameOver(payload: {
       winnerId: string | null;
       isDraw: boolean;
       players: PublicPlayer[];
       board: Board;
+      boardSize: TatetiSize;
     }) {
       setStatus("finished");
-      setWinnerId(winner);
-      setIsDraw(draw);
-      setPlayers(updatedPlayers);
-      setBoard(finalBoard);
+      setWinnerId(payload.winnerId);
+      setIsDraw(payload.isDraw);
+      setPlayers(payload.players);
+      setBoard(payload.board);
+      setBoardSize(payload.boardSize);
       setYourTurn(false);
       setCurrentTurnId(null);
     }
 
-    function onRematchStarted({
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-      players: updatedPlayers,
-      board: newBoard,
-      marks: newMarks,
-    }: {
-      currentTurnId: string;
+    function onRematchStarted(payload: {
+      currentTurnId: string | null;
       yourTurn: boolean;
       players: PublicPlayer[];
       board: Board;
+      boardSize: TatetiSize;
       marks: Record<string, Mark>;
     }) {
       setStatus("playing");
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
-      setPlayers(updatedPlayers);
-      setBoard(newBoard);
-      setMarks(newMarks);
+      setCurrentTurnId(payload.currentTurnId);
+      setYourTurn(payload.yourTurn);
+      setPlayers(payload.players);
+      setBoard(payload.board);
+      setBoardSize(payload.boardSize);
+      setMarks(payload.marks);
       setWinnerId(null);
       setIsDraw(false);
       setError("");
@@ -188,9 +165,7 @@ export default function TatetiSalaPage() {
     socket.on("playerDisconnected", onPlayerDisconnected);
     socket.on("error", onError);
 
-    if (socket.connected) {
-      setConnected(true);
-    }
+    if (socket.connected) setConnected(true);
 
     if (!storedPlayerId && storedNickname) {
       socket.emit("joinRoom", {
@@ -213,16 +188,6 @@ export default function TatetiSalaPage() {
     };
   }, [code]);
 
-  function handlePlace(index: number) {
-    setError("");
-    getSocket().emit("placeMark", { index });
-  }
-
-  function handleRematch() {
-    setError("");
-    getSocket().emit("rematch");
-  }
-
   return (
     <main className="page">
       <h1 className="brand">Tateti</h1>
@@ -239,13 +204,20 @@ export default function TatetiSalaPage() {
             status={status}
             currentTurnId={currentTurnId}
             board={board}
+            boardSize={boardSize}
             marks={marks}
             yourTurn={yourTurn}
             playerId={playerId}
             winnerId={winnerId}
             isDraw={isDraw}
-            onPlace={handlePlace}
-            onRematch={handleRematch}
+            onPlace={(index) => {
+              setError("");
+              getSocket().emit("placeMark", { index });
+            }}
+            onRematch={() => {
+              setError("");
+              getSocket().emit("rematch");
+            }}
             error={error}
           />
         )}

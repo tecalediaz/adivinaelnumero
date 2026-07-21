@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GAME_META, GameType } from "@/lib/types";
 
-const GAMES: GameType[] = ["adivina", "tateti"];
+const GAMES: GameType[] = ["adivina", "tateti", "viborita"];
 
 export default function HomePage() {
   return (
@@ -11,7 +11,7 @@ export default function HomePage() {
         Elegí un juego, creá una sala y compartí el código con un amigo.
       </p>
 
-      <div className="game-menu">
+      <div className="game-menu game-menu-3">
         {GAMES.map((game) => {
           const meta = GAME_META[game];
           return (

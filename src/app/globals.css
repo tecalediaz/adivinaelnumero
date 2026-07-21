@@ -469,6 +469,158 @@ input {
   .game-menu {
     grid-template-columns: 1fr 1fr;
   }
+
+  .game-menu-3 {
+    max-width: 56rem;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.page-wide {
+  padding-inline: 1rem;
+}
+
+.card-wide {
+  max-width: min(760px, 100%);
+}
+
+.size-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.size-option {
+  flex: 1;
+  padding: 0.7rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-soft);
+  color: var(--ink-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.size-option.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue-hover);
+}
+
+.field-hint {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.board-size-label {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-bottom: 0.5rem;
+}
+
+.snake-hud {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.snake-target {
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--ink-muted);
+}
+
+.snake-target strong {
+  color: var(--blue-hover);
+  font-size: 1.15rem;
+}
+
+.snake-scores {
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (min-width: 520px) {
+  .snake-scores {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.snake-score-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.snake-score-chip strong {
+  margin-left: auto;
+  color: var(--blue-hover);
+}
+
+.snake-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.snake-canvas-wrap {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #050505;
+}
+
+.snake-canvas {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.snake-controls-hint {
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.snake-mobile-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
+.snake-mobile-controls button {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.snake-mobile-controls > div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+@media (min-width: 800px) {
+  .snake-mobile-controls {
+    display: none;
+  }
 }
 
 .game-card {
@@ -564,11 +716,12 @@ input {
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 8vw, 2.4rem);
+  font-size: clamp(1.2rem, 5vw, 2.2rem);
   font-weight: 700;
   color: var(--ink);
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
   min-height: 0;
+  aspect-ratio: 1;
 }
 
 .tateti-cell:not(:disabled):hover {

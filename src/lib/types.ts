@@ -1,4 +1,4 @@
-export type GameType = "adivina" | "tateti";
+export type GameType = "adivina" | "tateti" | "viborita";
 
 export type Hint = "higher" | "lower" | "correct";
 
@@ -8,7 +8,16 @@ export type Mark = "X" | "O";
 
 export type Cell = Mark | null;
 
-export type Board = [Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell, Cell];
+export type Board = Cell[];
+
+export type TatetiSize = 3 | 4 | 5;
+
+export type Direction = "up" | "down" | "left" | "right";
+
+export interface Point {
+  x: number;
+  y: number;
+}
 
 export interface Player {
   id: string;
@@ -24,6 +33,23 @@ export interface GuessEntry {
   hint: Hint;
 }
 
+export interface SnakePlayerState {
+  playerId: string;
+  body: Point[];
+  direction: Direction;
+  pendingDirection: Direction;
+  score: number;
+  alive: boolean;
+}
+
+export interface ViboritaState {
+  width: number;
+  height: number;
+  snakes: SnakePlayerState[];
+  foods: Point[];
+  targetScore: number;
+}
+
 export interface RoomState {
   code: string;
   gameType: GameType;
@@ -37,14 +63,32 @@ export interface RoomState {
   secret: number | null;
   guesses: GuessEntry[];
   // Tateti
+  boardSize: TatetiSize;
   board: Board;
   marks: Record<string, Mark>;
+  // Viborita
+  viborita: ViboritaState | null;
 }
 
 export interface PublicPlayer {
   id: string;
   nickname: string;
   wins: number;
+}
+
+export interface PublicSnake {
+  playerId: string;
+  body: Point[];
+  direction: Direction;
+  score: number;
+}
+
+export interface PublicViboritaState {
+  width: number;
+  height: number;
+  snakes: PublicSnake[];
+  foods: Point[];
+  targetScore: number;
 }
 
 export interface PublicRoomState {
@@ -57,12 +101,18 @@ export interface PublicRoomState {
   winnerId: string | null;
   isDraw: boolean;
   board: Board;
+  boardSize: TatetiSize;
   marks: Record<string, Mark>;
   secret: number | null;
+  viborita: PublicViboritaState | null;
 }
 
 export interface ClientToServerEvents {
-  createRoom: (payload: { nickname: string; gameType: GameType }) => void;
+  createRoom: (payload: {
+    nickname: string;
+    gameType: GameType;
+    boardSize?: TatetiSize;
+  }) => void;
   joinRoom: (payload: {
     code: string;
     nickname: string;
@@ -70,6 +120,7 @@ export interface ClientToServerEvents {
   }) => void;
   guess: (payload: { value: number }) => void;
   placeMark: (payload: { index: number }) => void;
+  setDirection: (payload: { direction: Direction }) => void;
   rematch: () => void;
 }
 
@@ -89,17 +140,21 @@ export interface ServerToClientEvents {
     guesses: GuessEntry[];
     currentTurnId: string | null;
     board: Board;
+    boardSize: TatetiSize;
     marks: Record<string, Mark>;
     isDraw: boolean;
     winnerId: string | null;
+    viborita: PublicViboritaState | null;
   }) => void;
   playerJoined: (payload: { players: PublicPlayer[] }) => void;
   gameStarted: (payload: {
     players: PublicPlayer[];
-    currentTurnId: string;
+    currentTurnId: string | null;
     yourTurn: boolean;
     board: Board;
+    boardSize: TatetiSize;
     marks: Record<string, Mark>;
+    viborita: PublicViboritaState | null;
   }) => void;
   guessResult: (payload: {
     playerId: string;
@@ -111,10 +166,15 @@ export interface ServerToClientEvents {
   }) => void;
   boardUpdated: (payload: {
     board: Board;
+    boardSize: TatetiSize;
     nextTurnId: string | null;
     playerId: string;
     index: number;
     mark: Mark;
+  }) => void;
+  snakeState: (payload: {
+    viborita: PublicViboritaState;
+    players: PublicPlayer[];
   }) => void;
   gameOver: (payload: {
     winnerId: string | null;
@@ -122,14 +182,18 @@ export interface ServerToClientEvents {
     secret: number | null;
     players: PublicPlayer[];
     board: Board;
+    boardSize: TatetiSize;
+    viborita: PublicViboritaState | null;
   }) => void;
   rematchStarted: (payload: {
-    currentTurnId: string;
+    currentTurnId: string | null;
     yourTurn: boolean;
     guesses: GuessEntry[];
     players: PublicPlayer[];
     board: Board;
+    boardSize: TatetiSize;
     marks: Record<string, Mark>;
+    viborita: PublicViboritaState | null;
   }) => void;
   playerDisconnected: (payload: { message: string }) => void;
   error: (payload: { message: string }) => void;
@@ -140,17 +204,20 @@ export const MAX_NUMBER = 10000;
 export const ROOM_CODE_LENGTH = 4;
 export const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export const EMPTY_BOARD: Board = [
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-  null,
-];
+export const TATETI_SIZES: TatetiSize[] = [3, 4, 5];
+
+export const SNAKE_WIDTH = 48;
+export const SNAKE_HEIGHT = 32;
+export const SNAKE_FOOD_COUNT = 14;
+export const SNAKE_START_LENGTH = 3;
+export const SNAKE_POINTS_PER_FOOD = 100;
+export const SNAKE_TARGET_MIN = 2000;
+export const SNAKE_TARGET_MAX = 5000;
+export const SNAKE_TICK_MS = 110;
+
+export function createEmptyBoard(size: TatetiSize): Board {
+  return Array.from({ length: size * size }, () => null);
+}
 
 export const GAME_META: Record<
   GameType,
@@ -165,7 +232,17 @@ export const GAME_META: Record<
   tateti: {
     title: "Tateti",
     description:
-      "Clásico 3x3 online. Jugá con un amigo, turnos alternados y marcador acumulado.",
+      "Elegí tablero 3x3, 4x4 o 5x5. Jugá online con turnos y marcador acumulado.",
     path: "/tateti",
   },
+  viborita: {
+    title: "Viborita",
+    description:
+      "Dos viboritas en un tablero grande. Comé, crecé y llegá primero al puntaje objetivo.",
+    path: "/viborita",
+  },
 };
+
+export function gameTypeLabel(gameType: GameType): string {
+  return GAME_META[gameType].title;
+}

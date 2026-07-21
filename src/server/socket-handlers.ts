@@ -2,11 +2,16 @@ import { Server, Socket } from "socket.io";
 import {
   ClientToServerEvents,
   GameType,
+  RoomState,
+  SNAKE_TICK_MS,
   ServerToClientEvents,
+  TATETI_SIZES,
 } from "../lib/types";
 import {
   createRoom,
+  finishViborita,
   getPlayerInRoom,
+  getRoomByCode,
   getRoomBySocketId,
   handleDisconnect,
   joinRoom,
@@ -16,16 +21,89 @@ import {
   startRematch,
   toPublicRoomState,
 } from "./game";
+import { setSnakeDirection, tickViborita, toPublicViborita } from "./snake";
 
 type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-const VALID_GAMES: GameType[] = ["adivina", "tateti"];
+const VALID_GAMES: GameType[] = ["adivina", "tateti", "viborita"];
+const snakeLoops = new Map<string, ReturnType<typeof setInterval>>();
+
+function stopSnakeLoop(code: string): void {
+  const timer = snakeLoops.get(code);
+  if (timer) {
+    clearInterval(timer);
+    snakeLoops.delete(code);
+  }
+}
+
+function startSnakeLoop(
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  roomCode: string
+): void {
+  stopSnakeLoop(roomCode);
+
+  const loop = setInterval(() => {
+    const room = getRoomByCode(roomCode);
+    if (!room || room.gameType !== "viborita" || room.status !== "playing") {
+      stopSnakeLoop(roomCode);
+      return;
+    }
+
+    const winnerId = tickViborita(room);
+
+    if (room.viborita) {
+      io.to(room.code).emit("snakeState", {
+        viborita: toPublicViborita(room.viborita),
+        players: toPublicRoomState(room).players,
+      });
+    }
+
+    if (winnerId) {
+      finishViborita(room, winnerId);
+      stopSnakeLoop(roomCode);
+      io.to(room.code).emit("gameOver", {
+        winnerId: room.winnerId,
+        isDraw: false,
+        secret: null,
+        players: toPublicRoomState(room).players,
+        board: room.board,
+        boardSize: room.boardSize,
+        viborita: room.viborita ? toPublicViborita(room.viborita) : null,
+      });
+    }
+  }, SNAKE_TICK_MS);
+
+  snakeLoops.set(roomCode, loop);
+}
+
+function emitGameStarted(
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  room: RoomState
+): void {
+  const publicState = toPublicRoomState(room);
+
+  for (const roomPlayer of room.players) {
+    io.to(roomPlayer.socketId).emit("gameStarted", {
+      players: publicState.players,
+      currentTurnId: room.currentTurnId,
+      yourTurn: room.currentTurnId === roomPlayer.id,
+      board: room.board,
+      boardSize: room.boardSize,
+      marks: publicState.marks,
+      viborita: publicState.viborita,
+    });
+  }
+
+  if (room.gameType === "viborita") {
+    startSnakeLoop(io, room.code);
+  }
+}
 
 export function registerSocketHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>
 ): void {
   io.on("connection", (socket: AppSocket) => {
-    socket.on("createRoom", ({ nickname, gameType }) => {
+    socket.on("createRoom", ({ nickname, gameType, boardSize }) => {
       const trimmed = nickname?.trim();
       if (!trimmed) {
         socket.emit("error", { message: "Ingresá un nickname." });
@@ -37,7 +115,12 @@ export function registerSocketHandlers(
         return;
       }
 
-      const room = createRoom(trimmed, socket.id, gameType);
+      const size =
+        gameType === "tateti" && boardSize && TATETI_SIZES.includes(boardSize)
+          ? boardSize
+          : 3;
+
+      const room = createRoom(trimmed, socket.id, gameType, size);
       const player = room.players[0];
 
       socket.join(room.code);
@@ -85,25 +168,18 @@ export function registerSocketHandlers(
         guesses: room.guesses,
         currentTurnId: room.currentTurnId,
         board: room.board,
+        boardSize: room.boardSize,
         marks: publicState.marks,
         isDraw: room.isDraw,
         winnerId: room.winnerId,
+        viborita: publicState.viborita,
       });
 
       if (room.players.length === 2) {
         socket.to(room.code).emit("playerJoined", {
           players: publicState.players,
         });
-
-        for (const roomPlayer of room.players) {
-          io.to(roomPlayer.socketId).emit("gameStarted", {
-            players: publicState.players,
-            currentTurnId: room.currentTurnId!,
-            yourTurn: roomPlayer.id === room.currentTurnId,
-            board: room.board,
-            marks: publicState.marks,
-          });
-        }
+        emitGameStarted(io, room);
       }
     });
 
@@ -144,6 +220,8 @@ export function registerSocketHandlers(
           secret: room.secret,
           players: toPublicRoomState(room).players,
           board: room.board,
+          boardSize: room.boardSize,
+          viborita: null,
         });
       }
     });
@@ -169,6 +247,7 @@ export function registerSocketHandlers(
 
       io.to(room.code).emit("boardUpdated", {
         board: room.board,
+        boardSize: room.boardSize,
         nextTurnId: room.currentTurnId,
         playerId: player.id,
         index,
@@ -182,8 +261,18 @@ export function registerSocketHandlers(
           secret: null,
           players: toPublicRoomState(room).players,
           board: room.board,
+          boardSize: room.boardSize,
+          viborita: null,
         });
       }
+    });
+
+    socket.on("setDirection", ({ direction }) => {
+      const room = getRoomBySocketId(socket.id);
+      if (!room) return;
+      const player = getPlayerInRoom(room, socket.id);
+      if (!player) return;
+      setSnakeDirection(room, player.id, direction);
     });
 
     socket.on("rematch", () => {
@@ -205,18 +294,25 @@ export function registerSocketHandlers(
         return;
       }
 
+      stopSnakeLoop(room.code);
       startRematch(room);
       const publicState = toPublicRoomState(room);
 
       for (const player of room.players) {
         io.to(player.socketId).emit("rematchStarted", {
-          currentTurnId: room.currentTurnId!,
-          yourTurn: player.id === room.currentTurnId,
+          currentTurnId: room.currentTurnId,
+          yourTurn: room.currentTurnId === player.id,
           guesses: room.guesses,
           players: publicState.players,
           board: room.board,
+          boardSize: room.boardSize,
           marks: publicState.marks,
+          viborita: publicState.viborita,
         });
+      }
+
+      if (room.gameType === "viborita") {
+        startSnakeLoop(io, room.code);
       }
     });
 
@@ -225,6 +321,7 @@ export function registerSocketHandlers(
       if (!result) return;
 
       const { room, message } = result;
+      stopSnakeLoop(room.code);
       socket.to(room.code).emit("playerDisconnected", { message });
     });
   });

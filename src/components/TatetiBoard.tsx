@@ -5,6 +5,7 @@ import {
   Mark,
   PublicPlayer,
   RoomStatus,
+  TatetiSize,
 } from "@/lib/types";
 import { Lobby } from "@/components/Lobby";
 
@@ -14,6 +15,7 @@ interface TatetiBoardProps {
   status: RoomStatus;
   currentTurnId: string | null;
   board: Board;
+  boardSize: TatetiSize;
   marks: Record<string, Mark>;
   yourTurn: boolean;
   playerId: string | null;
@@ -30,6 +32,7 @@ export function TatetiBoard({
   status,
   currentTurnId,
   board,
+  boardSize,
   marks,
   yourTurn,
   playerId,
@@ -47,6 +50,10 @@ export function TatetiBoard({
   return (
     <div>
       <Lobby code={code} players={players} status={status} />
+
+      <p className="board-size-label">
+        Tablero {boardSize}×{boardSize}
+      </p>
 
       {error && <div className="error-banner">{error}</div>}
 
@@ -86,7 +93,12 @@ export function TatetiBoard({
       )}
 
       {(isPlaying || status === "finished") && (
-        <div className="tateti-grid" role="grid" aria-label="Tablero de tateti">
+        <div
+          className="tateti-grid"
+          style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)` }}
+          role="grid"
+          aria-label={`Tablero de tateti ${boardSize} por ${boardSize}`}
+        >
           {board.map((cell, index) => (
             <button
               key={index}

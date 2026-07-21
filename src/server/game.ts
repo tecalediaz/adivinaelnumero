@@ -1,6 +1,5 @@
 import {
   Board,
-  EMPTY_BOARD,
   GameType,
   GuessEntry,
   Hint,
@@ -13,20 +12,18 @@ import {
   ROOM_CODE_CHARS,
   ROOM_CODE_LENGTH,
   RoomState,
+  TATETI_SIZES,
+  TatetiSize,
+  createEmptyBoard,
+  gameTypeLabel,
 } from "../lib/types";
+import {
+  createViboritaState,
+  resetViboritaForRematch,
+  toPublicViborita,
+} from "./snake";
 
 const rooms = new Map<string, RoomState>();
-
-const WIN_LINES: number[][] = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
 
 function generateRoomCode(): string {
   let code = "";
@@ -56,21 +53,25 @@ export function toPublicRoomState(room: RoomState): PublicRoomState {
     winnerId: room.winnerId,
     isDraw: room.isDraw,
     board: room.board,
+    boardSize: room.boardSize,
     marks: { ...room.marks },
     secret: room.status === "finished" ? room.secret : null,
+    viborita: room.viborita ? toPublicViborita(room.viborita) : null,
   };
 }
 
 export function createRoom(
   nickname: string,
   socketId: string,
-  gameType: GameType
+  gameType: GameType,
+  boardSize: TatetiSize = 3
 ): RoomState {
   let code = generateRoomCode();
   while (rooms.has(code)) {
     code = generateRoomCode();
   }
 
+  const size = TATETI_SIZES.includes(boardSize) ? boardSize : 3;
   const playerId = crypto.randomUUID();
   const room: RoomState = {
     code,
@@ -83,8 +84,10 @@ export function createRoom(
     isDraw: false,
     secret: null,
     guesses: [],
-    board: [...EMPTY_BOARD] as Board,
+    boardSize: size,
+    board: createEmptyBoard(size),
     marks: {},
+    viborita: null,
   };
 
   rooms.set(code, room);
@@ -106,7 +109,7 @@ export function joinRoom(
 
   if (room.gameType !== gameType) {
     return {
-      error: `Esa sala es de ${room.gameType === "adivina" ? "Adivina el número" : "Tateti"}.`,
+      error: `Esa sala es de ${gameTypeLabel(room.gameType)}.`,
     };
   }
 
@@ -129,11 +132,16 @@ export function joinRoom(
   return { room, playerId };
 }
 
-function assignMarks(room: RoomState): void {
-  const [host, guest] = room.players;
+function pickRandomStarterId(room: RoomState): string {
+  const index = Math.floor(Math.random() * room.players.length);
+  return room.players[index].id;
+}
+
+function assignMarks(room: RoomState, starterId: string): void {
+  const other = room.players.find((player) => player.id !== starterId);
   room.marks = {
-    [host.id]: "X",
-    [guest.id]: "O",
+    [starterId]: "X",
+    ...(other ? { [other.id]: "O" } : {}),
   };
 }
 
@@ -141,19 +149,39 @@ export function startGame(room: RoomState): void {
   room.status = "playing";
   room.winnerId = null;
   room.isDraw = false;
-  room.currentTurnId = room.hostId;
 
   if (room.gameType === "adivina") {
+    const starterId = pickRandomStarterId(room);
+    room.currentTurnId = starterId;
     room.secret = generateSecret();
     room.guesses = [];
-    room.board = [...EMPTY_BOARD] as Board;
+    room.board = createEmptyBoard(room.boardSize);
     room.marks = {};
-  } else {
+    room.viborita = null;
+    return;
+  }
+
+  if (room.gameType === "tateti") {
+    const starterId = pickRandomStarterId(room);
+    room.currentTurnId = starterId;
     room.secret = null;
     room.guesses = [];
-    room.board = [...EMPTY_BOARD] as Board;
-    assignMarks(room);
+    room.board = createEmptyBoard(room.boardSize);
+    assignMarks(room, starterId);
+    room.viborita = null;
+    return;
   }
+
+  // viborita
+  room.currentTurnId = null;
+  room.secret = null;
+  room.guesses = [];
+  room.marks = {};
+  room.board = createEmptyBoard(3);
+  room.viborita = createViboritaState([
+    room.players[0].id,
+    room.players[1].id,
+  ]);
 }
 
 export function getRoomByCode(code: string): RoomState | undefined {
@@ -237,13 +265,67 @@ export function processGuess(
   return { entry, gameOver: false };
 }
 
-function checkWinner(board: Board): Mark | null {
-  for (const [a, b, c] of WIN_LINES) {
-    const mark = board[a];
-    if (mark && mark === board[b] && mark === board[c]) {
-      return mark;
+function checkWinner(board: Board, size: TatetiSize): Mark | null {
+  const need = size;
+
+  // Rows
+  for (let y = 0; y < size; y++) {
+    const first = board[y * size];
+    if (!first) continue;
+    let win = true;
+    for (let x = 1; x < need; x++) {
+      if (board[y * size + x] !== first) {
+        win = false;
+        break;
+      }
+    }
+    if (win) return first;
+  }
+
+  // Cols
+  for (let x = 0; x < size; x++) {
+    const first = board[x];
+    if (!first) continue;
+    let win = true;
+    for (let y = 1; y < need; y++) {
+      if (board[y * size + x] !== first) {
+        win = false;
+        break;
+      }
+    }
+    if (win) return first;
+  }
+
+  // Diagonal \
+  {
+    const first = board[0];
+    if (first) {
+      let win = true;
+      for (let i = 1; i < need; i++) {
+        if (board[i * size + i] !== first) {
+          win = false;
+          break;
+        }
+      }
+      if (win) return first;
     }
   }
+
+  // Diagonal /
+  {
+    const first = board[size - 1];
+    if (first) {
+      let win = true;
+      for (let i = 1; i < need; i++) {
+        if (board[i * size + (size - 1 - i)] !== first) {
+          win = false;
+          break;
+        }
+      }
+      if (win) return first;
+    }
+  }
+
   return null;
 }
 
@@ -270,7 +352,8 @@ export function processPlaceMark(
     return { error: "No es tu turno." };
   }
 
-  if (!Number.isInteger(index) || index < 0 || index > 8) {
+  const maxIndex = room.boardSize * room.boardSize - 1;
+  if (!Number.isInteger(index) || index < 0 || index > maxIndex) {
     return { error: "Casilla inválida." };
   }
 
@@ -285,7 +368,7 @@ export function processPlaceMark(
 
   room.board[index] = mark;
 
-  const winningMark = checkWinner(room.board);
+  const winningMark = checkWinner(room.board, room.boardSize);
   if (winningMark) {
     room.status = "finished";
     room.isDraw = false;
@@ -315,17 +398,28 @@ export function startRematch(room: RoomState): void {
   room.status = "playing";
   room.winnerId = null;
   room.isDraw = false;
-  room.currentTurnId = room.hostId;
 
   if (room.gameType === "adivina") {
+    room.currentTurnId = pickRandomStarterId(room);
     room.secret = generateSecret();
     room.guesses = [];
-  } else {
+    return;
+  }
+
+  if (room.gameType === "tateti") {
+    const starterId = pickRandomStarterId(room);
+    room.currentTurnId = starterId;
     room.secret = null;
     room.guesses = [];
-    room.board = [...EMPTY_BOARD] as Board;
-    assignMarks(room);
+    room.board = createEmptyBoard(room.boardSize);
+    assignMarks(room, starterId);
+    return;
   }
+
+  room.currentTurnId = null;
+  room.secret = null;
+  room.guesses = [];
+  resetViboritaForRematch(room);
 }
 
 export function handleDisconnect(socketId: string): {
@@ -345,4 +439,15 @@ export function handleDisconnect(socketId: string): {
     room,
     message: `${player.nickname} se desconectó. La partida terminó.`,
   };
+}
+
+export function finishViborita(room: RoomState, winnerId: string): void {
+  room.status = "finished";
+  room.winnerId = winnerId;
+  room.isDraw = false;
+  room.currentTurnId = null;
+  const winner = room.players.find((p) => p.id === winnerId);
+  if (winner) {
+    winner.wins += 1;
+  }
 }

@@ -3,26 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { GameBoard } from "@/components/GameBoard";
+import { ViboritaBoard } from "@/components/ViboritaBoard";
 import { getSocket } from "@/lib/socket";
 import {
-  GuessEntry,
+  Direction,
   PublicPlayer,
+  PublicViboritaState,
   RoomStatus,
 } from "@/lib/types";
 
-export default function AdivinaSalaPage() {
+export default function ViboritaSalaPage() {
   const params = useParams();
   const code = (params.code as string)?.toUpperCase() ?? "";
 
   const [players, setPlayers] = useState<PublicPlayer[]>([]);
   const [status, setStatus] = useState<RoomStatus>("waiting");
-  const [currentTurnId, setCurrentTurnId] = useState<string | null>(null);
-  const [guesses, setGuesses] = useState<GuessEntry[]>([]);
-  const [yourTurn, setYourTurn] = useState(false);
+  const [viborita, setViborita] = useState<PublicViboritaState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
-  const [secret, setSecret] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
 
@@ -33,10 +31,7 @@ export default function AdivinaSalaPage() {
     const storedPlayerId = sessionStorage.getItem("playerId");
     const storedNickname = sessionStorage.getItem("nickname");
 
-    if (storedPlayerId) {
-      setPlayerId(storedPlayerId);
-    }
-
+    if (storedPlayerId) setPlayerId(storedPlayerId);
     if (storedPlayerId && storedNickname) {
       setPlayers([{ id: storedPlayerId, nickname: storedNickname, wins: 0 }]);
     }
@@ -45,111 +40,69 @@ export default function AdivinaSalaPage() {
       setConnected(true);
     }
 
-    function onRoomJoined({
-      playerId: joinedPlayerId,
-      players: joinedPlayers,
-      status: roomStatus,
-      guesses: roomGuesses,
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-    }: {
+    function onRoomJoined(payload: {
       playerId: string;
       players: PublicPlayer[];
       status: RoomStatus;
-      guesses: GuessEntry[];
-      currentTurnId: string | null;
-      yourTurn: boolean;
+      viborita: PublicViboritaState | null;
+      winnerId: string | null;
     }) {
-      setPlayerId(joinedPlayerId);
-      sessionStorage.setItem("playerId", joinedPlayerId);
-      setPlayers(joinedPlayers);
-      setStatus(roomStatus);
-      setGuesses(roomGuesses);
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
+      setPlayerId(payload.playerId);
+      sessionStorage.setItem("playerId", payload.playerId);
+      setPlayers(payload.players);
+      setStatus(payload.status);
+      setViborita(payload.viborita);
+      setWinnerId(payload.winnerId);
     }
 
-    function onPlayerJoined({ players: joinedPlayers }: { players: PublicPlayer[] }) {
-      setPlayers(joinedPlayers);
+    function onPlayerJoined({ players: joined }: { players: PublicPlayer[] }) {
+      setPlayers(joined);
     }
 
-    function onGameStarted({
-      players: gamePlayers,
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-    }: {
+    function onGameStarted(payload: {
       players: PublicPlayer[];
-      currentTurnId: string | null;
-      yourTurn: boolean;
+      viborita: PublicViboritaState | null;
     }) {
-      setPlayers(gamePlayers);
+      setPlayers(payload.players);
       setStatus("playing");
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
-      setGuesses([]);
+      setViborita(payload.viborita);
       setWinnerId(null);
-      setSecret(null);
       setError("");
     }
 
-    function onGuessResult({
-      nextTurnId,
-      guesses: updatedGuesses,
-    }: {
-      nextTurnId: string | null;
-      guesses: GuessEntry[];
+    function onSnakeState(payload: {
+      viborita: PublicViboritaState;
+      players: PublicPlayer[];
     }) {
-      setGuesses(updatedGuesses);
-      setCurrentTurnId(nextTurnId);
-      const activePlayerId = sessionStorage.getItem("playerId");
-      if (activePlayerId) {
-        setYourTurn(nextTurnId === activePlayerId);
-      }
+      setViborita(payload.viborita);
+      setPlayers(payload.players);
     }
 
-    function onGameOver({
-      winnerId: winner,
-      secret: revealedSecret,
-      players: updatedPlayers,
-    }: {
+    function onGameOver(payload: {
       winnerId: string | null;
-      secret: number | null;
       players: PublicPlayer[];
-      isDraw: boolean;
+      viborita: PublicViboritaState | null;
     }) {
       setStatus("finished");
-      setWinnerId(winner);
-      setSecret(revealedSecret);
-      setPlayers(updatedPlayers);
-      setYourTurn(false);
-      setCurrentTurnId(null);
+      setWinnerId(payload.winnerId);
+      setPlayers(payload.players);
+      setViborita(payload.viborita);
     }
 
-    function onRematchStarted({
-      currentTurnId: turnId,
-      yourTurn: isYourTurn,
-      guesses: clearedGuesses,
-      players: updatedPlayers,
-    }: {
-      currentTurnId: string | null;
-      yourTurn: boolean;
-      guesses: GuessEntry[];
+    function onRematchStarted(payload: {
       players: PublicPlayer[];
+      viborita: PublicViboritaState | null;
     }) {
       setStatus("playing");
-      setCurrentTurnId(turnId);
-      setYourTurn(isYourTurn);
-      setGuesses(clearedGuesses);
-      setPlayers(updatedPlayers);
+      setPlayers(payload.players);
+      setViborita(payload.viborita);
       setWinnerId(null);
-      setSecret(null);
       setError("");
     }
 
     function onPlayerDisconnected({ message }: { message: string }) {
       setStatus("aborted");
       setError(message);
-      setYourTurn(false);
     }
 
     function onError({ message }: { message: string }) {
@@ -160,21 +113,19 @@ export default function AdivinaSalaPage() {
     socket.on("roomJoined", onRoomJoined);
     socket.on("playerJoined", onPlayerJoined);
     socket.on("gameStarted", onGameStarted);
-    socket.on("guessResult", onGuessResult);
+    socket.on("snakeState", onSnakeState);
     socket.on("gameOver", onGameOver);
     socket.on("rematchStarted", onRematchStarted);
     socket.on("playerDisconnected", onPlayerDisconnected);
     socket.on("error", onError);
 
-    if (socket.connected) {
-      setConnected(true);
-    }
+    if (socket.connected) setConnected(true);
 
     if (!storedPlayerId && storedNickname) {
       socket.emit("joinRoom", {
         code,
         nickname: storedNickname,
-        gameType: "adivina",
+        gameType: "viborita",
       });
     }
 
@@ -183,7 +134,7 @@ export default function AdivinaSalaPage() {
       socket.off("roomJoined", onRoomJoined);
       socket.off("playerJoined", onPlayerJoined);
       socket.off("gameStarted", onGameStarted);
-      socket.off("guessResult", onGuessResult);
+      socket.off("snakeState", onSnakeState);
       socket.off("gameOver", onGameOver);
       socket.off("rematchStarted", onRematchStarted);
       socket.off("playerDisconnected", onPlayerDisconnected);
@@ -191,9 +142,8 @@ export default function AdivinaSalaPage() {
     };
   }, [code]);
 
-  function handleGuess(value: number) {
-    setError("");
-    getSocket().emit("guess", { value });
+  function handleDirection(direction: Direction) {
+    getSocket().emit("setDirection", { direction });
   }
 
   function handleRematch() {
@@ -202,33 +152,30 @@ export default function AdivinaSalaPage() {
   }
 
   return (
-    <main className="page">
-      <h1 className="brand">Adivina el número</h1>
+    <main className="page page-wide">
+      <h1 className="brand">Viborita</h1>
 
-      <div className="card" style={{ maxWidth: "32rem" }}>
+      <div className="card card-wide">
         {!connected ? (
           <p style={{ textAlign: "center", color: "var(--ink-muted)" }}>
             Conectando...
           </p>
         ) : (
-          <GameBoard
+          <ViboritaBoard
             code={code}
             players={players}
             status={status}
-            currentTurnId={currentTurnId}
-            guesses={guesses}
-            yourTurn={yourTurn}
+            viborita={viborita}
             playerId={playerId}
             winnerId={winnerId}
-            secret={secret}
-            onGuess={handleGuess}
+            onDirection={handleDirection}
             onRematch={handleRematch}
             error={error}
           />
         )}
       </div>
 
-      <Link href="/adivina" className="back-link">
+      <Link href="/viborita" className="back-link">
         ← Volver
       </Link>
     </main>
