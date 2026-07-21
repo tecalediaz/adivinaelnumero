@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Adivina el número",
-  description: "Juego multijugador online para adivinar un número del 0 al 1000",
+  description: "Juego multijugador online para adivinar un número del 0 al 10000",
 };
 
 export default function RootLayout({

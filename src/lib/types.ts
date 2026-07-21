@@ -90,6 +90,6 @@ export interface ServerToClientEvents {
 }
 
 export const MIN_NUMBER = 0;
-export const MAX_NUMBER = 1000;
+export const MAX_NUMBER = 10000;
 export const ROOM_CODE_LENGTH = 4;
 export const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
