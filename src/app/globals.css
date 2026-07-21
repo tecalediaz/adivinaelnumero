@@ -1,22 +1,23 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Sora:wght@400;500;600&display=swap");
 
 :root {
-  --bg: #f7f7f5;
-  --bg-elevated: #ffffff;
-  --ink: #0a0a0a;
-  --ink-muted: #6b6b6b;
-  --ink-faint: #a3a3a3;
-  --line: #e8e8e6;
-  --line-strong: #d4d4d2;
-  --blue: #2563eb;
-  --blue-soft: #eff4ff;
-  --blue-hover: #1d4ed8;
-  --danger: #dc2626;
-  --danger-soft: #fef2f2;
+  --bg: #0a0a0a;
+  --bg-elevated: #141414;
+  --bg-soft: #1a1a1a;
+  --ink: #f5f5f5;
+  --ink-muted: #9a9a9a;
+  --ink-faint: #5c5c5c;
+  --line: #262626;
+  --line-strong: #333333;
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.12);
+  --blue-hover: #60a5fa;
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
   --radius: 10px;
   --font-display: "Outfit", sans-serif;
   --font-body: "Sora", sans-serif;
-  --shadow: 0 1px 2px rgba(10, 10, 10, 0.04), 0 8px 24px rgba(10, 10, 10, 0.04);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 *,
@@ -45,8 +46,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, #ffffff 0%, var(--bg) 45%, #f0f2f7 100%),
-    radial-gradient(ellipse 70% 40% at 50% -10%, rgba(37, 99, 235, 0.08), transparent);
+    radial-gradient(ellipse 70% 45% at 50% -15%, rgba(59, 130, 246, 0.14), transparent 55%),
+    linear-gradient(180deg, #0f0f0f 0%, var(--bg) 50%, #080808 100%);
   pointer-events: none;
   z-index: -1;
 }
@@ -138,7 +139,7 @@ input {
 
 .field input {
   padding: 0.85rem 1rem;
-  background: var(--bg);
+  background: var(--bg-soft);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   color: var(--ink);
@@ -148,7 +149,7 @@ input {
 
 .field input:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .field input::placeholder {
@@ -166,7 +167,7 @@ input {
   font-weight: 600;
   font-size: 0.95rem;
   letter-spacing: -0.01em;
-  transition: transform 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: transform 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s, color 0.15s;
 }
 
 .btn:active:not(:disabled) {
@@ -180,11 +181,12 @@ input {
 
 .btn-primary {
   background: var(--ink);
-  color: #ffffff;
+  color: var(--bg);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--blue);
+  color: #ffffff;
 }
 
 .btn-secondary {
@@ -196,7 +198,7 @@ input {
 
 .btn-secondary:hover:not(:disabled) {
   border-color: var(--blue);
-  color: var(--blue);
+  color: var(--blue-hover);
   background: var(--blue-soft);
 }
 
@@ -222,7 +224,7 @@ input {
 
 .error-banner {
   background: var(--danger-soft);
-  border: 1px solid #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.35);
   color: var(--danger);
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -252,16 +254,16 @@ input {
 
 .status-waiting {
   background: var(--blue-soft);
-  color: var(--blue);
+  color: var(--blue-hover);
 }
 
 .status-playing {
   background: var(--ink);
-  color: #ffffff;
+  color: var(--bg);
 }
 
 .status-finished {
-  background: var(--bg);
+  background: var(--bg-soft);
   color: var(--ink-muted);
   border: 1px solid var(--line);
 }
@@ -291,7 +293,7 @@ input {
 }
 
 .player-wins {
-  color: var(--blue);
+  color: var(--blue-hover);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -322,7 +324,7 @@ input {
   padding: 1rem;
   margin: 1.25rem 0;
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--bg-soft);
   border: 1px solid var(--line);
 }
 
@@ -332,7 +334,7 @@ input {
 }
 
 .turn-indicator strong {
-  color: var(--blue);
+  color: var(--blue-hover);
 }
 
 .guess-form {
@@ -344,7 +346,7 @@ input {
 .guess-form input {
   flex: 1;
   padding: 0.85rem 1rem;
-  background: var(--bg);
+  background: var(--bg-soft);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   color: var(--ink);
@@ -354,7 +356,7 @@ input {
 
 .guess-form input:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .guess-form .btn {
@@ -409,7 +411,7 @@ input {
 }
 
 .hint-higher {
-  color: var(--blue);
+  color: var(--blue-hover);
   font-weight: 500;
 }
 
@@ -419,7 +421,7 @@ input {
 }
 
 .hint-correct {
-  color: var(--blue);
+  color: var(--blue-hover);
   font-weight: 700;
 }
 
@@ -429,11 +431,11 @@ input {
   margin: 1.25rem 0;
   border-radius: var(--radius);
   background: var(--blue-soft);
-  border: 1px solid #c7d7fe;
+  border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .winner-banner strong {
-  color: var(--blue);
+  color: var(--blue-hover);
   font-size: 1.15rem;
 }
 
@@ -453,7 +455,7 @@ input {
 }
 
 .back-link:hover {
-  color: var(--blue);
+  color: var(--blue-hover);
 }
 
 @media (max-width: 480px) {
