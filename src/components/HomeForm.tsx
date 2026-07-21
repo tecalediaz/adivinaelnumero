@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
+import { GameType } from "@/lib/types";
 
-export function HomeForm() {
+interface HomeFormProps {
+  gameType: GameType;
+}
+
+export function HomeForm({ gameType }: HomeFormProps) {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -23,11 +28,19 @@ export function HomeForm() {
 
     const socket = getSocket();
 
-    const onCreated = ({ code, playerId }: { code: string; playerId: string }) => {
+    const onCreated = ({
+      code,
+      playerId,
+    }: {
+      code: string;
+      playerId: string;
+      gameType: GameType;
+    }) => {
       sessionStorage.setItem("playerId", playerId);
       sessionStorage.setItem("nickname", trimmed);
+      sessionStorage.setItem("gameType", gameType);
       cleanup();
-      router.push(`/sala/${code}`);
+      router.push(`/${gameType}/sala/${code}`);
     };
 
     const onError = ({ message }: { message: string }) => {
@@ -43,7 +56,7 @@ export function HomeForm() {
 
     socket.on("roomCreated", onCreated);
     socket.on("error", onError);
-    socket.emit("createRoom", { nickname: trimmed });
+    socket.emit("createRoom", { nickname: trimmed, gameType });
   }
 
   function handleJoin() {
@@ -60,8 +73,9 @@ export function HomeForm() {
     }
 
     sessionStorage.setItem("nickname", trimmedNick);
+    sessionStorage.setItem("gameType", gameType);
     sessionStorage.removeItem("playerId");
-    router.push(`/sala/${trimmedCode}`);
+    router.push(`/${gameType}/sala/${trimmedCode}`);
   }
 
   return (

@@ -11,7 +11,7 @@ import {
   RoomStatus,
 } from "@/lib/types";
 
-export default function SalaPage() {
+export default function AdivinaSalaPage() {
   const params = useParams();
   const code = (params.code as string)?.toUpperCase() ?? "";
 
@@ -96,10 +96,6 @@ export default function SalaPage() {
       nextTurnId,
       guesses: updatedGuesses,
     }: {
-      playerId: string;
-      nickname: string;
-      value: number;
-      hint: string;
       nextTurnId: string | null;
       guesses: GuessEntry[];
     }) {
@@ -116,9 +112,10 @@ export default function SalaPage() {
       secret: revealedSecret,
       players: updatedPlayers,
     }: {
-      winnerId: string;
-      secret: number;
+      winnerId: string | null;
+      secret: number | null;
       players: PublicPlayer[];
+      isDraw: boolean;
     }) {
       setStatus("finished");
       setWinnerId(winner);
@@ -174,7 +171,11 @@ export default function SalaPage() {
     }
 
     if (!storedPlayerId && storedNickname) {
-      socket.emit("joinRoom", { code, nickname: storedNickname });
+      socket.emit("joinRoom", {
+        code,
+        nickname: storedNickname,
+        gameType: "adivina",
+      });
     }
 
     return () => {
@@ -227,8 +228,8 @@ export default function SalaPage() {
         )}
       </div>
 
-      <Link href="/" className="back-link">
-        ← Volver al inicio
+      <Link href="/adivina" className="back-link">
+        ← Volver
       </Link>
     </main>
   );

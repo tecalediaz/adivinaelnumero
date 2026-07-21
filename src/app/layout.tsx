@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Adivina el número",
-  description: "Juego multijugador online para adivinar un número del 0 al 10000",
+  title: "Sala de juegos",
+  description: "Juegos multijugador online: Adivina el número y Tateti",
 };
 
 export default function RootLayout({

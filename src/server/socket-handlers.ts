@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import {
   ClientToServerEvents,
+  GameType,
   ServerToClientEvents,
 } from "../lib/types";
 import {
@@ -10,6 +11,7 @@ import {
   handleDisconnect,
   joinRoom,
   processGuess,
+  processPlaceMark,
   startGame,
   startRematch,
   toPublicRoomState,
@@ -17,32 +19,48 @@ import {
 
 type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
+const VALID_GAMES: GameType[] = ["adivina", "tateti"];
+
 export function registerSocketHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>
 ): void {
   io.on("connection", (socket: AppSocket) => {
-    socket.on("createRoom", ({ nickname }) => {
+    socket.on("createRoom", ({ nickname, gameType }) => {
       const trimmed = nickname?.trim();
       if (!trimmed) {
         socket.emit("error", { message: "Ingresá un nickname." });
         return;
       }
 
-      const room = createRoom(trimmed, socket.id);
+      if (!VALID_GAMES.includes(gameType)) {
+        socket.emit("error", { message: "Juego inválido." });
+        return;
+      }
+
+      const room = createRoom(trimmed, socket.id, gameType);
       const player = room.players[0];
 
       socket.join(room.code);
-      socket.emit("roomCreated", { code: room.code, playerId: player.id });
+      socket.emit("roomCreated", {
+        code: room.code,
+        playerId: player.id,
+        gameType: room.gameType,
+      });
     });
 
-    socket.on("joinRoom", ({ code, nickname }) => {
+    socket.on("joinRoom", ({ code, nickname, gameType }) => {
       const trimmed = nickname?.trim();
       if (!trimmed) {
         socket.emit("error", { message: "Ingresá un nickname." });
         return;
       }
 
-      const result = joinRoom(code, trimmed, socket.id);
+      if (!VALID_GAMES.includes(gameType)) {
+        socket.emit("error", { message: "Juego inválido." });
+        return;
+      }
+
+      const result = joinRoom(code, trimmed, socket.id, gameType);
       if ("error" in result) {
         socket.emit("error", { message: result.error });
         return;
@@ -60,11 +78,16 @@ export function registerSocketHandlers(
       socket.emit("roomJoined", {
         code: room.code,
         playerId,
+        gameType: room.gameType,
         players: publicState.players,
         yourTurn: room.currentTurnId === playerId,
         status: room.status,
         guesses: room.guesses,
         currentTurnId: room.currentTurnId,
+        board: room.board,
+        marks: publicState.marks,
+        isDraw: room.isDraw,
+        winnerId: room.winnerId,
       });
 
       if (room.players.length === 2) {
@@ -77,6 +100,8 @@ export function registerSocketHandlers(
             players: publicState.players,
             currentTurnId: room.currentTurnId!,
             yourTurn: roomPlayer.id === room.currentTurnId,
+            board: room.board,
+            marks: publicState.marks,
           });
         }
       }
@@ -112,11 +137,51 @@ export function registerSocketHandlers(
         guesses: room.guesses,
       });
 
-      if (gameOver && room.secret !== null && room.winnerId) {
+      if (gameOver) {
         io.to(room.code).emit("gameOver", {
           winnerId: room.winnerId,
+          isDraw: room.isDraw,
           secret: room.secret,
           players: toPublicRoomState(room).players,
+          board: room.board,
+        });
+      }
+    });
+
+    socket.on("placeMark", ({ index }) => {
+      const room = getRoomBySocketId(socket.id);
+      if (!room) {
+        socket.emit("error", { message: "No estás en una sala." });
+        return;
+      }
+
+      const player = getPlayerInRoom(room, socket.id);
+      if (!player) {
+        socket.emit("error", { message: "Jugador no encontrado." });
+        return;
+      }
+
+      const result = processPlaceMark(room, player.id, index);
+      if ("error" in result) {
+        socket.emit("error", { message: result.error });
+        return;
+      }
+
+      io.to(room.code).emit("boardUpdated", {
+        board: room.board,
+        nextTurnId: room.currentTurnId,
+        playerId: player.id,
+        index,
+        mark: result.mark,
+      });
+
+      if (result.gameOver) {
+        io.to(room.code).emit("gameOver", {
+          winnerId: room.winnerId,
+          isDraw: room.isDraw,
+          secret: null,
+          players: toPublicRoomState(room).players,
+          board: room.board,
         });
       }
     });
@@ -141,14 +206,16 @@ export function registerSocketHandlers(
       }
 
       startRematch(room);
-      const publicPlayers = toPublicRoomState(room).players;
+      const publicState = toPublicRoomState(room);
 
       for (const player of room.players) {
         io.to(player.socketId).emit("rematchStarted", {
           currentTurnId: room.currentTurnId!,
           yourTurn: player.id === room.currentTurnId,
           guesses: room.guesses,
-          players: publicPlayers,
+          players: publicState.players,
+          board: room.board,
+          marks: publicState.marks,
         });
       }
     });
