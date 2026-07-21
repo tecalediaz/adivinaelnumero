@@ -1,4 +1,9 @@
-export type GameType = "adivina" | "tateti" | "viborita";
+export type GameType = "adivina" | "tateti" | "viborita" | "ppt";
+
+export type { PptChoice, PptPhase, PptState, PublicPptState } from "./ppt";
+export { PPT_CHOOSE_MS, PPT_OPTIONS, pptEmoji, pptLabel } from "./ppt";
+
+import type { PptChoice, PptState, PublicPptState } from "./ppt";
 
 export type Hint = "higher" | "lower" | "correct";
 
@@ -68,6 +73,8 @@ export interface RoomState {
   marks: Record<string, Mark>;
   // Viborita
   viborita: ViboritaState | null;
+  // Piedra papel tijera
+  ppt: PptState | null;
 }
 
 export interface PublicPlayer {
@@ -105,6 +112,7 @@ export interface PublicRoomState {
   marks: Record<string, Mark>;
   secret: number | null;
   viborita: PublicViboritaState | null;
+  ppt: PublicPptState | null;
 }
 
 export interface ClientToServerEvents {
@@ -121,6 +129,7 @@ export interface ClientToServerEvents {
   guess: (payload: { value: number }) => void;
   placeMark: (payload: { index: number }) => void;
   setDirection: (payload: { direction: Direction }) => void;
+  pptChoose: (payload: { choice: PptChoice }) => void;
   rematch: () => void;
 }
 
@@ -145,6 +154,7 @@ export interface ServerToClientEvents {
     isDraw: boolean;
     winnerId: string | null;
     viborita: PublicViboritaState | null;
+    ppt: PublicPptState | null;
   }) => void;
   playerJoined: (payload: { players: PublicPlayer[] }) => void;
   gameStarted: (payload: {
@@ -155,6 +165,7 @@ export interface ServerToClientEvents {
     boardSize: TatetiSize;
     marks: Record<string, Mark>;
     viborita: PublicViboritaState | null;
+    ppt: PublicPptState | null;
   }) => void;
   guessResult: (payload: {
     playerId: string;
@@ -176,6 +187,7 @@ export interface ServerToClientEvents {
     viborita: PublicViboritaState;
     players: PublicPlayer[];
   }) => void;
+  pptUpdate: (payload: { ppt: PublicPptState }) => void;
   gameOver: (payload: {
     winnerId: string | null;
     isDraw: boolean;
@@ -184,6 +196,7 @@ export interface ServerToClientEvents {
     board: Board;
     boardSize: TatetiSize;
     viborita: PublicViboritaState | null;
+    ppt: PublicPptState | null;
   }) => void;
   rematchStarted: (payload: {
     currentTurnId: string | null;
@@ -194,6 +207,7 @@ export interface ServerToClientEvents {
     boardSize: TatetiSize;
     marks: Record<string, Mark>;
     viborita: PublicViboritaState | null;
+    ppt: PublicPptState | null;
   }) => void;
   playerDisconnected: (payload: { message: string }) => void;
   error: (payload: { message: string }) => void;
@@ -240,6 +254,12 @@ export const GAME_META: Record<
     description:
       "Dos viboritas en un tablero grande. Comé, crecé y llegá primero al puntaje objetivo.",
     path: "/viborita",
+  },
+  ppt: {
+    title: "Piedra, papel o tijera",
+    description:
+      "Tenés 5 segundos para elegir. Después se revelan las manos y el ganador suma una victoria.",
+    path: "/ppt",
   },
 };
 

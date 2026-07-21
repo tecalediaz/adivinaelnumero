@@ -22,6 +22,13 @@ import {
   resetViboritaForRematch,
   toPublicViborita,
 } from "./snake";
+import {
+  comparePpt,
+  createPptState,
+  isPptChoice,
+  toPublicPpt,
+  type PptChoice,
+} from "../lib/ppt";
 
 const rooms = new Map<string, RoomState>();
 
@@ -42,7 +49,13 @@ function toPublicPlayers(players: Player[]): PublicPlayer[] {
   return players.map(({ id, nickname, wins }) => ({ id, nickname, wins }));
 }
 
-export function toPublicRoomState(room: RoomState): PublicRoomState {
+export function toPublicRoomState(
+  room: RoomState,
+  viewerId?: string
+): PublicRoomState {
+  const revealed =
+    room.status === "finished" || room.ppt?.phase === "revealed";
+
   return {
     code: room.code,
     gameType: room.gameType,
@@ -57,6 +70,10 @@ export function toPublicRoomState(room: RoomState): PublicRoomState {
     marks: { ...room.marks },
     secret: room.status === "finished" ? room.secret : null,
     viborita: room.viborita ? toPublicViborita(room.viborita) : null,
+    ppt:
+      room.ppt && viewerId
+        ? toPublicPpt(room.ppt, viewerId, Boolean(revealed))
+        : null,
   };
 }
 
@@ -88,6 +105,7 @@ export function createRoom(
     board: createEmptyBoard(size),
     marks: {},
     viborita: null,
+    ppt: null,
   };
 
   rooms.set(code, room);
@@ -158,6 +176,7 @@ export function startGame(room: RoomState): void {
     room.board = createEmptyBoard(room.boardSize);
     room.marks = {};
     room.viborita = null;
+    room.ppt = null;
     return;
   }
 
@@ -169,6 +188,18 @@ export function startGame(room: RoomState): void {
     room.board = createEmptyBoard(room.boardSize);
     assignMarks(room, starterId);
     room.viborita = null;
+    room.ppt = null;
+    return;
+  }
+
+  if (room.gameType === "ppt") {
+    room.currentTurnId = null;
+    room.secret = null;
+    room.guesses = [];
+    room.marks = {};
+    room.board = createEmptyBoard(3);
+    room.viborita = null;
+    room.ppt = createPptState([room.players[0].id, room.players[1].id]);
     return;
   }
 
@@ -182,6 +213,7 @@ export function startGame(room: RoomState): void {
     room.players[0].id,
     room.players[1].id,
   ]);
+  room.ppt = null;
 }
 
 export function getRoomByCode(code: string): RoomState | undefined {
@@ -394,6 +426,57 @@ export function processPlaceMark(
   return { mark, gameOver: false, isDraw: false };
 }
 
+export function processPptChoice(
+  room: RoomState,
+  playerId: string,
+  choice: unknown
+): { ok: true } | { error: string } {
+  if (room.gameType !== "ppt") {
+    return { error: "Esta sala no es de Piedra, papel o tijera." };
+  }
+
+  if (room.status !== "playing" || !room.ppt || room.ppt.phase !== "choosing") {
+    return { error: "Ya no se puede elegir." };
+  }
+
+  if (Date.now() >= room.ppt.deadline) {
+    return { error: "Se acabó el tiempo." };
+  }
+
+  if (!isPptChoice(choice)) {
+    return { error: "Elección inválida." };
+  }
+
+  if (!(playerId in room.ppt.choices)) {
+    return { error: "Jugador no encontrado." };
+  }
+
+  room.ppt.choices[playerId] = choice as PptChoice;
+  return { ok: true };
+}
+
+export function resolvePptRound(room: RoomState): void {
+  if (!room.ppt || room.players.length < 2) return;
+
+  room.ppt.phase = "revealed";
+  room.status = "finished";
+  room.currentTurnId = null;
+
+  const [a, b] = room.players;
+  const result = comparePpt(room.ppt.choices[a.id], room.ppt.choices[b.id]);
+
+  if (result === "draw") {
+    room.isDraw = true;
+    room.winnerId = null;
+    return;
+  }
+
+  room.isDraw = false;
+  const winner = result === "a" ? a : b;
+  room.winnerId = winner.id;
+  winner.wins += 1;
+}
+
 export function startRematch(room: RoomState): void {
   room.status = "playing";
   room.winnerId = null;
@@ -413,6 +496,14 @@ export function startRematch(room: RoomState): void {
     room.guesses = [];
     room.board = createEmptyBoard(room.boardSize);
     assignMarks(room, starterId);
+    return;
+  }
+
+  if (room.gameType === "ppt") {
+    room.currentTurnId = null;
+    room.secret = null;
+    room.guesses = [];
+    room.ppt = createPptState([room.players[0].id, room.players[1].id]);
     return;
   }
 

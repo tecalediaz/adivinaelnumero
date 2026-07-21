@@ -17,6 +17,8 @@ import {
   joinRoom,
   processGuess,
   processPlaceMark,
+  processPptChoice,
+  resolvePptRound,
   startGame,
   startRematch,
   toPublicRoomState,
@@ -25,8 +27,9 @@ import { setSnakeDirection, tickViborita, toPublicViborita } from "./snake";
 
 type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-const VALID_GAMES: GameType[] = ["adivina", "tateti", "viborita"];
+const VALID_GAMES: GameType[] = ["adivina", "tateti", "viborita", "ppt"];
 const snakeLoops = new Map<string, ReturnType<typeof setInterval>>();
+const pptTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function stopSnakeLoop(code: string): void {
   const timer = snakeLoops.get(code);
@@ -34,6 +37,64 @@ function stopSnakeLoop(code: string): void {
     clearInterval(timer);
     snakeLoops.delete(code);
   }
+}
+
+function stopPptTimer(code: string): void {
+  const timer = pptTimers.get(code);
+  if (timer) {
+    clearTimeout(timer);
+    pptTimers.delete(code);
+  }
+}
+
+function emitPptGameOver(
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  room: RoomState
+): void {
+  for (const player of room.players) {
+    const publicState = toPublicRoomState(room, player.id);
+    io.to(player.socketId).emit("gameOver", {
+      winnerId: room.winnerId,
+      isDraw: room.isDraw,
+      secret: null,
+      players: publicState.players,
+      board: room.board,
+      boardSize: room.boardSize,
+      viborita: null,
+      ppt: publicState.ppt,
+    });
+  }
+}
+
+function startPptTimer(
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  roomCode: string
+): void {
+  stopPptTimer(roomCode);
+
+  const room = getRoomByCode(roomCode);
+  if (!room?.ppt) return;
+
+  const delay = Math.max(0, room.ppt.deadline - Date.now());
+
+  const timer = setTimeout(() => {
+    pptTimers.delete(roomCode);
+    const current = getRoomByCode(roomCode);
+    if (
+      !current ||
+      current.gameType !== "ppt" ||
+      current.status !== "playing" ||
+      !current.ppt ||
+      current.ppt.phase !== "choosing"
+    ) {
+      return;
+    }
+
+    resolvePptRound(current);
+    emitPptGameOver(io, current);
+  }, delay);
+
+  pptTimers.set(roomCode, timer);
 }
 
 function startSnakeLoop(
@@ -69,6 +130,7 @@ function startSnakeLoop(
         board: room.board,
         boardSize: room.boardSize,
         viborita: room.viborita ? toPublicViborita(room.viborita) : null,
+        ppt: null,
       });
     }
   }, SNAKE_TICK_MS);
@@ -80,9 +142,8 @@ function emitGameStarted(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   room: RoomState
 ): void {
-  const publicState = toPublicRoomState(room);
-
   for (const roomPlayer of room.players) {
+    const publicState = toPublicRoomState(room, roomPlayer.id);
     io.to(roomPlayer.socketId).emit("gameStarted", {
       players: publicState.players,
       currentTurnId: room.currentTurnId,
@@ -91,11 +152,16 @@ function emitGameStarted(
       boardSize: room.boardSize,
       marks: publicState.marks,
       viborita: publicState.viborita,
+      ppt: publicState.ppt,
     });
   }
 
   if (room.gameType === "viborita") {
     startSnakeLoop(io, room.code);
+  }
+
+  if (room.gameType === "ppt") {
+    startPptTimer(io, room.code);
   }
 }
 
@@ -156,7 +222,7 @@ export function registerSocketHandlers(
         startGame(room);
       }
 
-      const publicState = toPublicRoomState(room);
+      const publicState = toPublicRoomState(room, playerId);
 
       socket.emit("roomJoined", {
         code: room.code,
@@ -173,6 +239,7 @@ export function registerSocketHandlers(
         isDraw: room.isDraw,
         winnerId: room.winnerId,
         viborita: publicState.viborita,
+        ppt: publicState.ppt,
       });
 
       if (room.players.length === 2) {
@@ -222,6 +289,7 @@ export function registerSocketHandlers(
           board: room.board,
           boardSize: room.boardSize,
           viborita: null,
+          ppt: null,
         });
       }
     });
@@ -263,7 +331,37 @@ export function registerSocketHandlers(
           board: room.board,
           boardSize: room.boardSize,
           viborita: null,
+          ppt: null,
         });
+      }
+    });
+
+    socket.on("pptChoose", ({ choice }) => {
+      const room = getRoomBySocketId(socket.id);
+      if (!room) {
+        socket.emit("error", { message: "No estás en una sala." });
+        return;
+      }
+
+      const player = getPlayerInRoom(room, socket.id);
+      if (!player) {
+        socket.emit("error", { message: "Jugador no encontrado." });
+        return;
+      }
+
+      const result = processPptChoice(room, player.id, choice);
+      if ("error" in result) {
+        socket.emit("error", { message: result.error });
+        return;
+      }
+
+      for (const roomPlayer of room.players) {
+        const publicState = toPublicRoomState(room, roomPlayer.id);
+        if (publicState.ppt) {
+          io.to(roomPlayer.socketId).emit("pptUpdate", {
+            ppt: publicState.ppt,
+          });
+        }
       }
     });
 
@@ -295,10 +393,11 @@ export function registerSocketHandlers(
       }
 
       stopSnakeLoop(room.code);
+      stopPptTimer(room.code);
       startRematch(room);
-      const publicState = toPublicRoomState(room);
 
       for (const player of room.players) {
+        const publicState = toPublicRoomState(room, player.id);
         io.to(player.socketId).emit("rematchStarted", {
           currentTurnId: room.currentTurnId,
           yourTurn: room.currentTurnId === player.id,
@@ -308,11 +407,16 @@ export function registerSocketHandlers(
           boardSize: room.boardSize,
           marks: publicState.marks,
           viborita: publicState.viborita,
+          ppt: publicState.ppt,
         });
       }
 
       if (room.gameType === "viborita") {
         startSnakeLoop(io, room.code);
+      }
+
+      if (room.gameType === "ppt") {
+        startPptTimer(io, room.code);
       }
     });
 
@@ -322,6 +426,7 @@ export function registerSocketHandlers(
 
       const { room, message } = result;
       stopSnakeLoop(room.code);
+      stopPptTimer(room.code);
       socket.to(room.code).emit("playerDisconnected", { message });
     });
   });
