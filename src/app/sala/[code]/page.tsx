@@ -206,7 +206,7 @@ export default function SalaPage() {
 
       <div className="card" style={{ maxWidth: "32rem" }}>
         {!connected ? (
-          <p style={{ textAlign: "center", color: "var(--text-muted)" }}>
+          <p style={{ textAlign: "center", color: "var(--ink-muted)" }}>
             Conectando...
           </p>
         ) : (

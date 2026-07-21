@@ -11,7 +11,7 @@ interface LobbyProps {
 export function Lobby({ code, players, status }: LobbyProps) {
   return (
     <div>
-      <p style={{ textAlign: "center", color: "var(--text-muted)" }}>
+      <p style={{ textAlign: "center", color: "var(--ink-muted)" }}>
         Código de sala
       </p>
       <p className="room-code">{code}</p>
@@ -43,7 +43,7 @@ export function Lobby({ code, players, status }: LobbyProps) {
       </ul>
 
       {status === "waiting" && (
-        <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+        <p style={{ textAlign: "center", color: "var(--ink-muted)", fontSize: "0.9rem" }}>
           Compartí el código con tu amigo para que se una.
         </p>
       )}

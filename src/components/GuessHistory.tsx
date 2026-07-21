@@ -31,7 +31,7 @@ export function GuessHistory({ guesses }: GuessHistoryProps) {
     return (
       <div className="history">
         <h3>Historial</h3>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+        <p style={{ color: "var(--ink-muted)", fontSize: "0.9rem" }}>
           Todavía no hay intentos.
         </p>
       </div>
