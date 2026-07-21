@@ -8,7 +8,7 @@ import {
 import { registerSocketHandlers } from "./src/server/socket-handlers";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = process.env.HOSTNAME || "localhost";
+const hostname = process.env.HOSTNAME || (dev ? "localhost" : "0.0.0.0");
 const port = parseInt(process.env.PORT || "3000", 10);
 
 function getAllowedOrigins(): string | string[] | boolean {

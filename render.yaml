@@ -1,13 +1,10 @@
 services:
   - type: web
-    name: adivinaelnumero-socket
+    name: adivinaelnumero
     runtime: node
     plan: free
-    buildCommand: npm install
-    startCommand: npm run start:socket
-    healthCheckPath: /health
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ALLOWED_ORIGINS
-        sync: false
